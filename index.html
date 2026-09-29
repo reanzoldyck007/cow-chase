@@ -1,0 +1,493 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cow Chase: Make the C Code Faster</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#eef2f5;--card:#fff;--soft:#f5f8fa;--ink:#14212b;--mute:#5a6b78;--line:#d5dde3;--acc:#0e7c86;--accbg:#e2f3f4;--good:#1e9e5a;--goodt:#157a45;--bad:#d64545;--badt:#b83232;--warn:#c9820c}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f171d;--card:#17222b;--soft:#1c2a34;--ink:#e6edf2;--mute:#93a4b1;--line:#2b3a45;--acc:#3cc4cf;--accbg:#16343a;--good:#38c07a;--goodt:#38c07a;--bad:#ef6b6b;--badt:#ef6b6b;--warn:#f4b13e}}
+:root[data-theme="dark"]{--bg:#0f171d;--card:#17222b;--soft:#1c2a34;--ink:#e6edf2;--mute:#93a4b1;--line:#2b3a45;--acc:#3cc4cf;--accbg:#16343a;--good:#38c07a;--goodt:#38c07a;--bad:#ef6b6b;--badt:#ef6b6b;--warn:#f4b13e}
+*,*:before,*:after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:1360px;margin:0 auto;padding:16px}
+h1{font-size:1.6rem;line-height:1.2;margin:0 0 2px}h2{font-size:1.1rem;margin:0}h3{font-size:.95rem;margin:16px 0 6px}
+b{font-weight:650}
+code{font:.86em ui-monospace,Menlo,Consolas,monospace;background:var(--soft);border:1px solid var(--line);padding:0 5px;border-radius:4px}
+.sub,.note{color:var(--mute);margin:0}.note{font-size:.86rem;margin-top:6px}
+.pos{color:var(--goodt)}.neg{color:var(--badt)}
+canvas{width:100%;height:auto;display:block}
+
+/* layout */
+.lay{display:grid;grid-template-columns:300px minmax(0,1fr);gap:16px;align-items:start;margin-top:8px}
+.side{position:sticky;top:12px;display:flex;flex-direction:column;gap:8px;max-height:calc(100vh - 24px);overflow-y:auto;padding:1px}
+.col{display:flex;flex-direction:column;gap:12px;min-width:0}
+.bench{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:12px;align-items:start}
+@media(max-width:1100px){.bench{grid-template-columns:1fr}}
+@media(max-width:860px){.lay{grid-template-columns:1fr}.side{position:static;max-height:none}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;min-width:0}
+.chd{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:8px}.chd .note{margin:0}
+
+/* level tabs */
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 0}
+.tab{font:inherit;font-size:.88rem;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+.tab[aria-current=true]{border-color:var(--acc);background:var(--accbg);box-shadow:inset 0 0 0 1px var(--acc);font-weight:650}
+.tab:disabled{opacity:.45;cursor:not-allowed}
+
+/* left dropdowns */
+.acc{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.acc>summary{list-style:none;cursor:pointer;padding:10px 12px;font-weight:650;display:flex;align-items:center;gap:10px;color:var(--ink)}
+.acc>summary::-webkit-details-marker{display:none}
+.acc>summary::after{content:'';flex:none;margin:0 2px 3px 2px;width:7px;height:7px;border-right:2px solid var(--mute);border-bottom:2px solid var(--mute);transform:rotate(45deg);transition:transform .2s}
+.acc[open]>summary::after{transform:rotate(-135deg);margin-bottom:-3px}
+.acc>summary:hover{background:var(--soft)}
+.acc[open]>summary{border-bottom:1px solid var(--line)}
+.acc .bd{padding:10px 12px 12px}
+.side>*{flex:none}
+.tt{flex:1;min-width:0}
+.ico{flex:none;width:28px;height:28px;border-radius:8px;background:var(--accbg);display:grid;place-items:center;font-size:.95rem}
+.bdg{flex:none;min-width:22px;height:22px;padding:0 6px;border-radius:99px;background:var(--acc);color:#fff;font-size:.78rem;line-height:22px;text-align:center}
+.acc[open]>.bd,.acc[open]>p{animation:dd .18s ease-out}
+@keyframes dd{from{opacity:0;transform:translateY(-4px)}}
+
+/* how to play */
+ol.how{list-style:none;margin:0;padding:0}
+ol.how li{display:flex;gap:10px;padding:8px 0;align-items:flex-start;color:var(--mute);font-size:.88rem;line-height:1.4}
+ol.how li+li{border-top:1px dashed var(--line)}ol.how li:first-child{padding-top:0}
+ol.how b{color:var(--ink);display:block;font-size:.92rem}
+ol.how .n{flex:none;width:24px;height:24px;border-radius:50%;background:var(--acc);color:#fff;text-align:center;line-height:24px;font-size:.8rem;font-weight:700}
+.key{margin-top:8px;padding-top:10px;border-top:1px solid var(--line)}.key .note{margin:8px 0 0}
+
+/* hints */
+.hn{margin:0 0 6px;color:var(--mute);font-size:.84rem}
+.acc.in{border-radius:8px;margin:6px 0 0;background:var(--soft)}
+.acc.in>summary{padding:8px 10px;font-weight:500;gap:8px}
+.acc.in .hl{font-weight:650;color:var(--acc)}
+.acc.in .tt{font-size:.9rem}
+.acc.in>p{margin:0;padding:9px 10px 10px;color:var(--ink);font-size:.9rem;line-height:1.45}
+.sp{display:flex;gap:3px}.sp i{width:6px;height:6px;border-radius:50%;border:1px solid var(--mute)}.sp i.on{background:var(--warn);border-color:var(--warn)}
+
+/* cycle cost table */
+.rt{display:grid;grid-template-columns:1fr auto;gap:5px 10px;font-size:.88rem;margin:0}.rt dt{color:var(--mute)}.rt dd{margin:0;font-weight:650;text-align:right}
+
+/* chips */
+.chs{display:flex;flex-wrap:wrap;gap:6px}
+.ch{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;background:var(--soft);border:1px solid var(--line);font-size:.82rem;color:var(--mute)}.ch b{color:var(--ink)}
+.lg{display:inline-block;width:10px;height:10px;border-radius:3px}
+
+/* problem card */
+.ph{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+.tag{padding:2px 10px;border-radius:999px;background:var(--accbg);color:var(--acc);font-size:.8rem;font-weight:600}
+.lvl{margin-left:auto;color:var(--mute);font-size:.84rem}
+.task{margin:8px 0 10px}
+
+/* race */
+#res{font-size:1.02rem;font-weight:600;margin-top:6px}#pre{min-height:1.3em}
+.shake{animation:sh .5s}@keyframes sh{0%,100%{transform:none}20%{transform:translate(-9px,3px)}40%{transform:translate(9px,-3px)}60%{transform:translate(-6px,2px)}80%{transform:translate(5px,-2px)}}
+
+/* editor + checks */
+textarea{width:100%;height:clamp(300px,46vh,430px);font:13px/1.45 ui-monospace,Menlo,Consolas,monospace;tab-size:2;white-space:pre;overflow:auto;resize:vertical;background:var(--soft);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:10px}
+textarea:read-only{opacity:.75}
+.row{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.btn{font:inherit;font-weight:600;padding:8px 16px;border-radius:8px;border:1px solid var(--acc);background:var(--acc);color:#fff;cursor:pointer}
+.btn.alt{background:var(--card);color:var(--ink);border-color:var(--line);font-weight:500}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+#nx{margin-top:10px}
+.btn:focus-visible,textarea:focus-visible,summary:focus-visible,.tab:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+#con{margin-top:10px;min-height:24px}
+.stp{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;margin:6px 0 0;border-radius:8px;background:var(--soft);border-left:3px solid var(--line)}
+.stp.o{border-left-color:var(--good)}.stp.n{border-left-color:var(--warn)}.stp.x{border-left-color:var(--bad)}.stp.w{opacity:.7}
+.stp .ic{flex:none}.stp .d{color:var(--mute);font-size:.86rem}
+.tps{display:flex;flex-wrap:wrap;gap:4px;margin:2px 0}
+.tp{padding:0 8px;border-radius:99px;border:1px solid;font-size:.78rem}.tp.p{color:var(--goodt);border-color:var(--good)}.tp.f{color:var(--badt);border-color:var(--bad)}
+
+/* speed report */
+.goal{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:baseline}.goal span{color:var(--mute);font-size:.88rem}.goal span.pos{font-weight:650}
+.gb{height:12px;background:var(--soft);border:1px solid var(--line);border-radius:6px;overflow:hidden;margin:6px 0 2px}.gb i{display:block;height:100%;background:var(--warn);transition:width .3s}.gb.ok i{background:var(--good)}
+.k{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin:12px 0 0}
+.k div{background:var(--soft);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column}
+.k small{color:var(--mute);font-size:.8rem}.k b{font-size:1.25rem;font-variant-numeric:tabular-nums}.k em{font-style:normal;color:var(--mute);font-size:.76rem}
+.big{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;margin:4px 0 8px}
+.big b{font-size:1.5rem;font-variant-numeric:tabular-nums}.big span{color:var(--mute)}.big small{margin-left:auto;color:var(--mute);font-size:.8rem}
+.sl{display:flex;align-items:flex-end;gap:1px;height:112px;overflow-x:auto;padding:4px;margin-top:10px;background:var(--soft);border-radius:8px}
+.sl i{flex:1 0 4px;max-width:14px;height:100%;display:flex;flex-direction:column-reverse;cursor:pointer}.sl i:hover{background:var(--line)}.sl i span{display:block}
+.cl{margin:10px 0 0;padding:8px 10px;border-left:3px solid var(--acc);background:var(--accbg);border-radius:0 8px 8px 0;font-size:.9rem}
+
+.mo{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;padding:16px;background:rgba(10,18,24,.6);backdrop-filter:blur(3px)}
+.mo.on{display:flex;animation:fd .2s ease-out}
+.md{position:relative;width:min(420px,100%);background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:16px;padding:28px 22px 22px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.35);animation:pp .28s cubic-bezier(.2,1.3,.4,1)}
+.md .x{position:absolute;top:10px;right:10px;width:32px;height:32px;border-radius:50%;border:1px solid var(--line);background:var(--soft);color:var(--mute);font:inherit;font-size:1.1rem;line-height:1;cursor:pointer}
+.md .x:hover{color:var(--ink);border-color:var(--mute)}
+.md .em{font-size:2.6rem;line-height:1}
+.md h2{font-size:1.5rem;margin:6px 0 2px}
+.md .st{font-size:2rem;letter-spacing:4px;color:var(--warn);margin:4px 0}
+.md .st s{text-decoration:none;color:var(--line)}
+.md p{margin:4px 0;color:var(--mute);font-size:.92rem}
+.md p b{color:var(--ink)}
+.md .row{justify-content:center;margin-top:18px}
+.md .row .btn{flex:1 1 140px}
+.md .pts{font-size:1.35rem;font-weight:700;color:var(--goodt);margin:8px 0 2px}
+.md .all{margin-top:10px;padding:8px 10px;border-radius:8px;background:var(--accbg);color:var(--ink);font-size:.9rem}
+@keyframes fd{from{opacity:0}}@keyframes pp{from{opacity:0;transform:scale(.85) translateY(10px)}}
+#sr:not(:empty){margin-bottom:10px;padding:8px 10px;border-radius:8px;background:var(--soft);border-left:3px solid var(--warn)}
+#sr.o{border-left-color:var(--good)}#sr.x{border-left-color:var(--bad)}
+[hidden]{display:none!important}
+#reg{min-height:100vh;display:grid;place-items:center;padding:16px}
+.rc{width:min(460px,100%);background:var(--card);border:1px solid var(--line);border-radius:16px;padding:24px 22px}
+.rc h1{font-size:1.5rem}.rc .em{font-size:2.2rem}
+.fld{display:block;margin:14px 0 0;font-weight:600;font-size:.9rem}
+.fld input{width:100%;margin-top:4px;font:inherit;font-weight:400;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--soft);color:var(--ink)}
+.fld input:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+.rerr{color:var(--badt);min-height:1.3em;margin:10px 0 0;font-size:.88rem}
+.rc .btn{width:100%;margin-top:6px;padding:11px 16px}
+.btn.sm{padding:1px 10px;font-size:.78rem;margin-left:6px}
+#team{margin-top:6px}
+@media (prefers-reduced-motion:reduce){.mo.on,.md{animation:none}.acc[open]>.bd,.acc[open]>p,.shake{animation:none}.gb i,.acc>summary::after{transition:none}}
+</style></head><body>
+<section id="reg" hidden><form class="rc" id="regf" novalidate>
+<div class="em">🐄</div><h1>Cow Chase</h1><p class="sub">Register your team of 2 players, then press Play.</p>
+<label class="fld">Team name<input id="rt" maxlength="40" autocomplete="off" required placeholder="e.g. Code Runners"></label>
+<label class="fld">Player 1<input id="rp1" maxlength="40" autocomplete="off" required placeholder="Full name"></label>
+<label class="fld">Player 2<input id="rp2" maxlength="40" autocomplete="off" required placeholder="Full name"></label>
+<p class="rerr" id="rerr" role="alert"></p>
+<button class="btn" id="rgo" type="submit">▶ Play</button>
+<p class="note" id="rwarn" hidden>⚠ Google Sheet not connected yet: set SHEET_URL in the code.</p>
+</form></section>
+<main hidden>
+<header><h1>Cow Chase: Make the C Code Faster</h1><p class="sub">Fewer CPU cycles = a faster runner. Outrun the cow to unlock the next problem.</p><div id="team" class="note"></div></header>
+<div class="tabs" id="tabs"></div>
+<div class="lay"><aside class="side" aria-label="Help">
+<details class="acc"><summary><span class="ico">📖</span><span class="tt">How to Play</span></summary><div class="bd"><ol class="how">
+<li><span class="n">1</span><div><b>Edit the C code</b>Checks and cycles update as you type.</div></li>
+<li><span class="n">2</span><div><b>Pass all 3 tests</b>Same answer as the reference, on different data.</div></li>
+<li><span class="n">3</span><div><b>Hit the goal</b>Fill the green bar: cycles at or under the goal.</div></li>
+<li><span class="n">4</span><div><b>Submit &amp; Race</b>Beat the cow's 9 m/s to escape and unlock the next problem. ★ escaped, ★★★ near-perfect.</div></li></ol>
+<div class="key"><div class="chs"><span class="ch"><i class="lg" style="background:#f0a9d0"></i>Memory wait</span><span class="ch"><i class="lg" style="background:#f5d76e"></i>Wrong guess</span><span class="ch"><i class="lg" style="background:#9be3c3"></i>Math</span></div><p class="note">Cycle meter colors. Hover a bar for its numbers.</p></div></div></details>
+<details class="acc"><summary><span class="ico">💡</span><span class="tt">Hints</span><span class="bdg">3</span></summary><div class="bd" id="hints"></div></details>
+<details class="acc"><summary><span class="ico">⚙️</span><span class="tt">Cycle costs</span></summary><div class="bd"><dl class="rt"><dt>add, compare</dt><dd>1</dd><dt>multiply</dt><dd>3</dd><dt>divide, modulo</dt><dd>10</dd><dt>cache hit</dt><dd>1</dd><dt>cache miss</dt><dd>20</dd><dt>wrong branch guess</dt><dd>+8</dd></dl>
+<p class="note">Mini C: int, global arrays, for/while/if. No pointers, printf, floats or extra functions.</p></div></details>
+</aside><div class="col">
+<div class="card" id="prob"></div>
+<div class="card"><canvas id="cv" width="700" height="130" role="img" aria-label="Race track with a runner and a cow"></canvas>
+<div id="pre" class="note"></div><div id="res" aria-live="polite"></div><button class="btn" id="nx" hidden>Next problem →</button></div>
+<div class="bench">
+<div class="card"><div class="chd"><h2>Your C code</h2><span class="note">Checks run when you submit</span></div><textarea id="code" spellcheck="false" aria-label="C code editor"></textarea>
+<div class="row"><button class="btn" id="go">🏁 Submit &amp; Race</button><button class="btn alt" id="rs">Reset to starter</button></div>
+<div id="con" aria-live="polite"></div></div>
+<div class="card"><div class="chd"><h2>Speed report</h2></div><div id="sr" aria-live="polite"></div><div id="gl"></div><div id="st"></div>
+<h3>Cycle meter</h3>
+<div id="cnt"></div><div id="sl" class="sl" aria-label="Cycles per time slice"></div><p id="sn" class="note"></p>
+<div id="sh" class="note">Hover or tap a bar for its breakdown.</div>
+<div class="row"><button class="btn alt" id="rp">▶ Replay cycle run</button></div><div id="clue"></div></div>
+</div></div></div></main>
+<div class="mo" id="mo" aria-hidden="true"><div class="md" role="dialog" aria-modal="true" aria-labelledby="mt"><button class="x" id="mx" aria-label="Close">✕</button><div id="mb"></div>
+<div class="row"><button class="btn alt" id="mre">↻ Retry</button><button class="btn" id="mnx">Next →</button></div></div></div>
+<script>
+const $=s=>document.querySelector(s),H=(id,h)=>$('#'+id).innerHTML=h,esc=s=>s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const PROBS=[
+{n:'Column Walk',t:'cache and locality',g:1.4,
+k:'Add up every reading in the 32×32 sensor grid and return the total.',
+h:['C stores <code>a[r][c]</code> row by row. Which loop changes the column: the inner one or the outer one?','A cache line holds 8 neighbouring ints. Walking down a column jumps 32 ints each step, so almost every read is a miss (pink bars).','Swap the two <code>for</code> loops so the inner loop walks along <code>c</code>.'],
+s:`#include <stdio.h>
+
+int a[32][32];   // sensor readings, 0..99
+
+int main() {
+  int sum = 0;
+  for (int c = 0; c < 32; c++) {
+    for (int r = 0; r < 32; r++) {
+      sum += a[r][c];
+    }
+  }
+  return sum;
+}
+`,
+r:`int a[32][32];int main(){int sum=0;for(int r=0;r<32;r++){for(int c=0;c<32;c++){sum+=a[r][c];}}return sum;}`},
+{n:'Slow Math',t:'CPU performance equation',g:1.3,
+k:'For every reading, add (reading ÷ 8) and (reading mod 16) to a total. Return the total. Readings are 0 to 99.',
+h:['Check "Cycle costs" on the left. Which operators cost 10 cycles?','Dividing by 8 is the same as shifting right by 3 (<code>&gt;&gt; 3</code>). For non-negative numbers, mod 16 is the same as <code>&amp; 15</code>.','<code>a[i]</code> is read twice. Load it once into a variable.'],
+s:`#include <stdio.h>
+
+int a[1024];   // readings, 0..99
+
+int main() {
+  int sum = 0;
+  for (int i = 0; i < 1024; i++) {
+    sum += a[i] / 8;
+    sum += a[i] % 16;
+  }
+  return sum;
+}
+`,
+r:`int a[1024];int main(){int sum=0;for(int i=0;i<1024;i++){int v=a[i];sum+=(v>>3)+(v&15);}return sum;}`},
+{n:'Grade Buckets',t:'branch prediction',g:1.25,
+k:'Give each reading points: below 25 gives 1, 25 to 49 gives 2, 50 to 74 gives 3, 75 or more gives 4. Return the total points.',
+h:['The if / else if chain jumps on random data, so the predictor guesses wrong a lot (yellow bars).','A comparison such as <code>(v &gt;= 25)</code> gives 1 or 0, so you can add it instead of branching.','Try <code>1 + (v&gt;=25) + (v&gt;=50) + (v&gt;=75)</code>, and read <code>a[i]</code> only once.'],
+s:`#include <stdio.h>
+
+int a[1024];   // readings, 0..99
+
+int main() {
+  int points = 0;
+  for (int i = 0; i < 1024; i++) {
+    if (a[i] < 25) {
+      points += 1;
+    } else if (a[i] < 50) {
+      points += 2;
+    } else if (a[i] < 75) {
+      points += 3;
+    } else {
+      points += 4;
+    }
+  }
+  return points;
+}
+`,
+r:`int a[1024];int main(){int p=0;for(int i=0;i<1024;i++){int v=a[i];p+=1+(v>=25)+(v>=50)+(v>=75);}return p;}`},
+{n:'Two Loops',t:"Amdahl's Law",g:1.4,
+k:'Round every reading down to an even number and add them all up, using both arrays. Return the total.',
+h:["Amdahl's Law: speeding up a small part barely helps. How many times does each loop run?",'Fix only the 16-iteration loop first and watch the cycle count barely move. Then fix the 1024-iteration loop.','<code>x / 2 * 2</code> clears the lowest bit. So does <code>x &amp; ~1</code>, at a fraction of the cost.'],
+s:`#include <stdio.h>
+
+int big[1024];   // 1024 readings
+int tiny[16];    // 16 readings
+
+int main() {
+  int total = 0;
+  for (int i = 0; i < 1024; i++) {
+    total += big[i] / 2 * 2;
+  }
+  for (int j = 0; j < 16; j++) {
+    total += tiny[j] / 2 * 2;
+  }
+  return total;
+}
+`,
+r:`int big[1024];int tiny[16];int main(){int t=0;for(int i=0;i<1024;i++){t+=big[i]&~1;}for(int j=0;j<16;j++){t+=tiny[j]&~1;}return t;}`},
+{n:'Sensor Grid',t:'boss level: everything at once',g:1.35,
+k:'Add up only the readings above 50, then multiply the total by the calibration constant (100/4+3)%10*2. Return the result.',
+h:['Which loop walks the array against the way it is stored? Recall Problem 1.','Does <code>scale</code> change between iterations? What is the cost of <code>/</code> and <code>%</code>?','A comparison gives 0 or 1. Can you multiply by it instead of using an <code>if</code>? Careful: measure, do not assume.'],
+s:`#include <stdio.h>
+
+int a[32][32];   // sensor grid, values 0..99
+
+int main() {
+  int sum = 0;
+  for (int c = 0; c < 32; c++) {
+    for (int r = 0; r < 32; r++) {
+      int scale = (100 / 4 + 3) % 10 * 2;
+      if (a[r][c] > 50) {
+        sum += a[r][c] * scale;
+      }
+    }
+  }
+  return sum;
+}
+`,
+r:`int a[32][32];int main(){int sum=0;int scale=(100/4+3)%10*2;for(int r=0;r<32;r++){for(int c=0;c<32;c++){int v=a[r][c];sum+=(v>50)*v;}}return sum*scale;}`}];
+const SEEDS=[12345,2024,99];
+
+/* ---- mini C interpreter with cost model ---- */
+let SEED=12345,cy,cm,cb,hits,miss,bc,mp,sites,V,A,bp,off,TL;const tag=new Int32Array(32),MAXC=2e6,BRK={},CNT={};
+const Ty=new Set(['int','long','short','unsigned','char','float','double','void']);
+const fail=(l,m)=>{throw new Error((l?'line '+l+': ':'')+m)};
+const mem=a=>{const b=a>>5,i=b&31;if(tag[i]===b){cy++;cm++;hits++}else{tag[i]=b;cy+=20;cm+=20;miss++}};
+const br=(id,v)=>{TL.length<6e4&&TL.push(cy,cm,cb);const t=v!=0,c=bp[id]??1;bc++;cy++;cb++;if((c>=2)!==t){cy+=8;cb+=8;mp++}bp[id]=t?Math.min(3,c+1):Math.max(0,c-1);if(cy>MAXC)fail(0,'stopped: the program is too slow or never ends');return t};
+const BIN={'+':(a,b)=>(cy++,a+b|0),'-':(a,b)=>(cy++,a-b|0),'*':(a,b)=>(cy+=3,Math.imul(a,b)),
+'/':(a,b)=>{cy+=10;if(!b)fail(0,'divide by zero');return Math.trunc(a/b)},'%':(a,b)=>{cy+=10;if(!b)fail(0,'divide by zero');return a%b},
+'&':(a,b)=>(cy++,a&b),'|':(a,b)=>(cy++,a|b),'^':(a,b)=>(cy++,a^b),'<<':(a,b)=>(cy++,a<<b),'>>':(a,b)=>(cy++,a>>b),
+'==':(a,b)=>(cy++,+(a==b)),'!=':(a,b)=>(cy++,+(a!=b)),'<':(a,b)=>(cy++,+(a<b)),'>':(a,b)=>(cy++,+(a>b)),'<=':(a,b)=>(cy++,+(a<=b)),'>=':(a,b)=>(cy++,+(a>=b))};
+const PR={'||':1,'&&':2,'|':3,'^':4,'&':5,'==':6,'!=':6,'<':7,'>':7,'<=':7,'>=':7,'<<':8,'>>':8,'+':9,'-':9,'*':10,'/':10,'%':10};
+function compile(src){
+ const T=[];let m,line=1,p=0;A={};off=0;sites=0;
+ src=src.replace(/^[ \t]*#.*$/gm,'');
+ const re=/(\n)|[ \t\r]+|\/\/[^\n]*|\/\*[\s\S]*?\*\/|(\d+)|([A-Za-z_]\w*)|(<<|>>|<=|>=|==|!=|&&|\|\||\+\+|--|[-+*\/%&|^]=|[-+*\/%<>=!&|^?:;,(){}\[\]~])|([^])/g;
+ while(m=re.exec(src)){if(m[1])line++;else if(m[2])T.push({t:'n',v:+m[2],l:line});else if(m[3])T.push({t:'i',v:m[3],l:line});else if(m[4])T.push({t:m[4],l:line});else if(m[5])fail(line,'the character '+m[5]+' is not supported in this mini compiler')}
+ const pk=()=>T[p],nx=()=>T[p++],ln=()=>(T[p]||T[T.length-1]||{l:0}).l,err=x=>fail(ln(),x),eat=t=>T[p]&&T[p].t==t&&++p,ex=t=>{if(!eat(t))err('expected '+t)},isw=w=>T[p]&&T[p].t=='i'&&T[p].v==w;
+ const un=()=>{const t=pk();if(!t)err('unexpected end of code');
+  if(eat('-')){const e=un();return()=>(cy++,-e()|0)}
+  if(eat('+'))return un();
+  if(eat('!')){const e=un();return()=>(cy++,+(e()==0))}
+  if(eat('~')){const e=un();return()=>(cy++,~e())}
+  if(t.t=='++'||t.t=='--'){p++;const e=un(),d=t.t=='++'?1:-1;if(!e.lv)err('++ and -- need a variable');return()=>{const L=e.lv(),v=L.get()+d;cy++;L.set(v);return v}}
+  let f;
+  if(eat('(')){f=asg();ex(')')}
+  else if(t.t=='n'){p++;const v=t.v;f=()=>v}
+  else if(t.t=='i'){p++;const n=t.v,l=t.l,ar=A[n];
+   if(ar){const ix=[];while(eat('[')){ix.push(asg());ex(']')}
+    if(ix.length!=ar.dm.length)err(n+' needs '+ar.dm.length+' index(es)');
+    const loc=()=>{let i=ix[0]();if(ix[1]){const j=ix[1]();cy+=2;i=i*ar.dm[1]+j}cy++;if(i<0||i>=ar.d.length)fail(l,'index out of range in '+n);return i};
+    f=()=>{const i=loc();mem(ar.base+i*4);return ar.d[i]};
+    f.lv=()=>{const i=loc();return{get:()=>{mem(ar.base+i*4);return ar.d[i]},set:v=>{mem(ar.base+i*4);ar.d[i]=v}}}}
+   else{const rd=()=>{const v=V[n];if(v===undefined)fail(l,n+' is not declared');return v};f=rd;f.lv=()=>({get:rd,set:v=>{if(V[n]===undefined)fail(l,n+' is not declared');V[n]=v}})}}
+  else err('unexpected '+t.t);
+  if(f.lv&&pk()&&(pk().t=='++'||pk().t=='--')){const d=nx().t=='++'?1:-1,g=f;f=()=>{const L=g.lv(),v=L.get();cy++;L.set(v+d);return v}}
+  return f};
+ const bin=mn=>{let l=un();for(;;){const t=pk(),pr=t&&PR[t.t];if(!pr||pr<mn)return l;p++;const r=bin(pr+1),o=t.t,a=l,id=sites++;let n;
+  if(o=='&&')n=()=>br(id,a())?+(r()!=0):0;else if(o=='||')n=()=>br(id,a())?1:+(r()!=0);else{const f=BIN[o];n=()=>f(a(),r())}l=n}};
+ const tern=()=>{const c=bin(1);if(!eat('?'))return c;const a=asg();ex(':');const b=asg(),id=sites++;return()=>br(id,c())?a():b()};
+ const asg=()=>{const l=tern(),t=pk();if(!t||!/^[-+*\/%&|^]?=$/.test(t.t))return l;if(!l.lv)err('the left side of = must be a variable');p++;const r=asg(),o=t.t.slice(0,-1),f=BIN[o];
+  return()=>{const L=l.lv(),v=o?f(L.get(),r()):r();L.set(v);return v}};
+ const stmt=()=>{const t=pk();if(!t)err('unexpected end of code');
+  if(eat('{')){const L=[];while(!eat('}')){if(!pk())err('missing }');L.push(stmt())}return()=>{for(const s of L){const r=s();if(r!==undefined)return r}}}
+  if(eat(';'))return()=>{};
+  if(t.t=='i'){
+   if(Ty.has(t.v)){while(pk()&&pk().t=='i'&&Ty.has(pk().v))p++;const D=[];do{const n=nx();if(!n||n.t!='i')err('expected a variable name');if(pk()&&pk().t=='[')err('declare arrays at the top of the file, outside main');D.push([n.v,eat('=')?asg():null])}while(eat(','));ex(';');return()=>{for(const[n,i]of D)V[n]=i?i():0}}
+   if(t.v=='if'){p++;ex('(');const c=asg(),id=sites++;ex(')');const a=stmt(),b=isw('else')&&++p?stmt():null;return()=>{if(br(id,c()))return a();if(b)return b()}}
+   if(t.v=='while'){p++;ex('(');const c=asg(),id=sites++;ex(')');const b=stmt();return()=>{while(br(id,c())){const r=b();if(r===BRK)break;if(r!==undefined&&r!==CNT)return r}}}
+   if(t.v=='for'){p++;ex('(');let ini=null,cd=null,st=null;
+    if(!eat(';')){if(pk().t=='i'&&Ty.has(pk().v))ini=stmt();else{const x=asg();ex(';');ini=()=>{x()}}}
+    const id=sites++;if(!eat(';')){cd=asg();ex(';')}if(!eat(')')){st=asg();ex(')')}const b=stmt();
+    return()=>{if(ini)ini();while(br(id,cd?cd():1)){const r=b();if(r===BRK)break;if(r!==undefined&&r!==CNT)return r;if(st)st()}}}
+   if(t.v=='return'){p++;const e=pk()&&pk().t==';'?null:asg();ex(';');return()=>({r:e?e():0})}
+   if(t.v=='break'){p++;ex(';');return()=>BRK}
+   if(t.v=='continue'){p++;ex(';');return()=>CNT}}
+  const e=asg();ex(';');return()=>{e()}};
+ let main=null;
+ while(p<T.length){while(pk()&&pk().t=='i'&&Ty.has(pk().v))p++;const n=nx();if(!n||n.t!='i')err('expected a name');
+  if(eat('(')){if(n.v!='main')err('only main() is supported: put your code inside main');if(!eat(')')){while(pk()&&pk().t!=')')p++;ex(')')}main=stmt()}
+  else{const dm=[];while(eat('[')){const s=nx();if(!s||s.t!='n')err('array size must be a number');dm.push(s.v);ex(']')}
+   if(!dm.length||dm.length>2)err('globals must be arrays, like int a[32][32];');ex(';');
+   const N=dm.reduce((x,y)=>x*y);if(N>4096)err('array too large');const d=new Int32Array(N);let s=SEED;
+   for(let i=0;i<N;i++){s=(Math.imul(s,1103515245)+12345)>>>0;d[i]=(s>>>16)%100}A[n.v]={dm,d,base:off};off=(off+N*4+31)&~31}}
+ if(!main)fail(0,'no main() found');return main}
+function run(src){cy=cm=cb=hits=miss=bc=mp=0;V={};bp={};TL=[0,0,0];tag.fill(-1);const main=compile(src),r=main();TL.push(cy,cm,cb);return{tl:TL,cy,cm,cb,hits,miss,bc,mp,val:r&&r.r!==undefined?r.r:0}}
+
+/* ---- game ---- */
+const PTS=10,K=9,HEAD=15,LEN=100;let P,BASE,REFS,REFR,GOAL,S3,cur=0;
+let last=null,anim=null,tm,attempts=0;const ed=$('#code');
+const out=v=>{if(v>=K)return{caught:false};const x=HEAD*K/(K-v);return{caught:x<LEN,x}};
+const SL=500,COL=['#f0a9d0','#f5d76e','#9be3c3'];let mt=null;
+const lock=b=>{ed.readOnly=b;['go','rs','rp'].forEach(i=>$('#'+i).disabled=b)};
+function frames(r){const T=r.tl,Q=r.sl,n=Math.ceil(r.cy/Q),F=[];let j=0;
+ const at=x=>{while(j+3<T.length&&T[j+3]<=x)j+=3;if(j+3>=T.length)return[T[j+1],T[j+2]];const f=(x-T[j])/(T[j+3]-T[j]);return[T[j+1]+f*(T[j+4]-T[j+1]),T[j+2]+f*(T[j+5]-T[j+2])]};
+ for(let i=0;i<n;i++){const s=i*Q,e=Math.min(s+Q,r.cy),[m0,b0]=at(s),[m1,b1]=at(e),m=Math.round(m1-m0),k=Math.round(b1-b0);F.push([m,k,Math.max(0,Math.round(e-s)-m-k)])}return F}
+const bars=(r,k)=>H('sl',r.F.slice(0,k).map((f,i)=>`<i data-i=${i}>${f.map((v,j)=>`<span style="height:${v/r.sl*100}%;background:${COL[j]}"></span>`).join('')}</i>`).join(''));
+const cnt=(r,c,k,m,b,p)=>{const n=v=>v.toLocaleString(),ch=(i,t,v)=>`<span class=ch><i class=lg style="background:${COL[i]}"></i>${t} <b>${n(v)}</b></span>`;
+ H('cnt',`<div class=big><b>${n(c)}</b><span>/ ${n(r.cy)} cycles</span><small>bar ${k} of ${r.F.length}</small></div><div class=chs>${ch(0,'Memory wait',m)}${ch(1,'Wrong guesses',b)}${ch(2,'Math',p)}</div>`)};
+function meterAt(r,p){const n=r.F.length,k=p>=1?n:Math.floor(p*n);bars(r,k);
+ if(k>=n){cnt(r,r.cy,n,r.cm,r.cb,r.cy-r.cm-r.cb);return}
+ let m=0,b=0,q=0;for(let i=0;i<k;i++){m+=r.F[i][0];b+=r.F[i][1];q+=r.F[i][2]}cnt(r,Math.min(r.cy,k*r.sl),k,m,b,q)}
+function meter(done){cancelAnimationFrame(mt);const r=last;if(!r||r.err){done&&done();return}let t0=null;const D=Math.min(2400,700+r.F.length*14);
+ const step=ts=>{if(t0===null)t0=ts;const p=Math.min(1,(ts-t0)/D);meterAt(r,p);if(p<1)mt=requestAnimationFrame(step);else{mt=null;done&&done()}};mt=requestAnimationFrame(step)}
+function draw(m,c,o,e){e=e||{};const cv=$('#cv'),x=cv.getContext('2d'),cs=getComputedStyle(cv),C=n=>cs.getPropertyValue(n).trim(),W=cv.width,S=v=>24+v/LEN*(W-70);
+ x.clearRect(0,0,W,130);x.font='12px system-ui';x.strokeStyle=C('--line');x.lineWidth=3;x.beginPath();x.moveTo(S(0),100);x.lineTo(S(LEN),100);x.stroke();
+ x.fillStyle=C('--mute');for(let d=0;d<=LEN;d+=20)x.fillText(d+' m',S(d)-12,120);
+ x.fillStyle=C('--good');x.fillRect(S(LEN),26,3,74);x.fillText('FINISH',S(LEN)-40,20);
+ if(o&&o.caught){x.fillStyle=C('--bad');x.fillText('✖ predicted catch',S(o.x)-44,50)}
+ x.font='34px serif';x.save();x.translate(S(m)+(e.dx||0),96-(e.dy||0));x.rotate(e.rot||0);x.fillText(e.face||'🏃',-16,0);x.restore();
+ x.save();x.translate(S(c)+16+(e.cdx||0),96);x.scale(-1,1);x.fillText('🐄',0,0);x.restore();
+ if(e.boom){x.font=(30+e.boom*60)+'px serif';x.fillText('💥',S(m)-22,84)}
+ (e.parts||[]).forEach(p=>{x.fillStyle=p.c;x.fillRect(p.x,p.y,6,6)})}
+function runAll(src){let f;const T=SEEDS.map((sd,i)=>{SEED=sd;const x=run(src);if(!i)f=x;return{ok:x.val===REFS[i].val,got:x.val,exp:REFS[i].val}});f.tests=T;return f}
+function steps(r,o){
+ const s=(ic,t,d,c)=>`<div class="stp ${c}"><span class=ic>${ic}</span><div><b>${t}</b>${d?`<div class=d>${d}</div>`:''}</div></div>`;
+ if(r.err)return H('con',s('❌','Compile failed',esc(r.err),'x'));
+ const T=r.tests,f=T.filter(t=>!t.ok).length,n=v=>v.toLocaleString(),
+  pills=`<span class=tps>${T.map((t,i)=>`<span class="tp ${t.ok?'p':'f'}">${t.ok?'✓':'✕'} Test ${i+1}</span>`).join('')}</span>`,
+  why=T.map((t,i)=>t.ok?'':`Test ${i+1}: returned ${t.got}, expected ${t.exp}`).filter(Boolean).join('<br>');
+ H('con',s('✅','Compiled','No errors','o')+(r.bad
+  ?s('⚠️',`Wrong answer · ${T.length-f} of ${T.length} tests pass`,pills+why,'x')
+  :r.cy<=GOAL?s('✅','Solved',`Correct answer and goal reached (${n(r.cy)} cycles). Press Submit &amp; Race.`,'o')
+  :s('⏳','Not solved yet',`The output is right, but the code is too slow: ${n(r.cy)} cycles, goal ${n(GOAL)}. Cut ${n(r.cy-GOAL)} more.`,'n')))}
+function live(){cancelAnimationFrame(mt);mt=null;let r;try{r=runAll(ed.value);r.v=Math.min(24,K*GOAL/r.cy);r.bad=r.tests.some(t=>!t.ok);r.sl=Math.max(SL,Math.ceil(r.cy/150/SL)*SL);r.F=frames(r)}catch(e){r={err:e.message}}last=r;
+ if(!shown){['gl','st','cnt','sl','sn','sh','clue','pre','sr'].forEach(i=>H(i,''));$('#sr').className='';
+  if(r.err)steps(r,null);else H('con','<div class=note>Press Submit &amp; Race to check your code.</div>');
+  if(!anim)draw(HEAD,0,null);return}
+ const o=r.err?null:out(r.v);steps(r,o);
+ if(r.err){['gl','st','cnt','sl','sn','sh','clue','pre'].forEach(i=>H(i,''));return}
+ const t=r.cy,cp=t-r.cm-r.cb,hr=r.hits/(r.hits+r.miss||1),mr=r.mp/(r.bc||1),cl=[],ok=t<=GOAL&&!r.bad,n=v=>v.toLocaleString();
+ H('st',`<div class=k>${[['Total cycles','fewer = faster',n(t)],['Speed-up','vs starter',(BASE/t).toFixed(1)+'×'],['Runner speed',`cow ${K} m/s`,r.v.toFixed(1)+' m/s'],['Cache hits','higher = better',(hr*100).toFixed(0)+'%'],['Wrong guesses','lower = better',(mr*100).toFixed(0)+'%']].map(([a,b,c])=>`<div><small>${a}</small><b>${c}</b><em>${b}</em></div>`).join('')}</div>`);
+ H('gl',`<div class=goal><b>🎯 Goal: ${n(GOAL)} cycles or fewer</b><span class="${ok?'pos':''}">${r.bad?'Pass every test first':ok?'Reached ✔':'Cut '+n(t-GOAL)+' more'}</span></div><div class="gb${ok?' ok':''}"><i style="width:${r.bad?0:Math.min(100,GOAL/t*100)}%"></i></div><div class=note>★★★ at ${n(S3)} or fewer</div>`);
+ bars(r,r.F.length);cnt(r,t,r.F.length,r.cm,r.cb,cp);H('sn',`1 bar = ${r.sl} cycles. Fewer bars = faster code.`);H('sh','Hover or tap a bar for its breakdown.');
+ if(r.cm/t>.4)cl.push('Memory waits cost the most. Check the order you walk the array.');
+ if(r.cb/t>.12&&mr>.1)cl.push('Wrong branch guesses cost the most. Can you get the same result without an <code>if</code>?');
+ if(cp/t>.4)cl.push('Math costs the most. Is anything recalculated that never changes?');
+ H('clue',cl.length?cl.map(x=>`<div class=cl>💡 ${x}</div>`).join(''):'<div class=cl>💡 No clear bottleneck left. Push lower for ★★★.</div>');
+ H('pre','');renderSub();
+ if(!anim)draw(HEAD,0,null)}
+let subRes=null,shown=false;
+function renderSub(){const el=$('#substep');el&&el.remove();const sr=$('#sr'),R=last;
+ if(!subRes||!R||R.err){sr.className='';sr.innerHTML='';return}
+ const q=subRes,n=v=>v.toLocaleString(),st=q.s=='win'?'★'.repeat(q.stars)+'☆'.repeat(3-q.stars):'';
+ let c,ic,t,d,line;
+ if(q.s=='run'){c='n';ic='🏃';t='Racing…';d='The cow is chasing your runner.';line='<div class=goal><b>🏁 Race result</b><span>Racing…</span></div>'}
+ else if(q.s=='win'){c='o';ic='🏁';t=`Submitted · Escaped ${st}`;d=`Problem ${q.p} cleared · ${n(q.cy)} cycles · ${(BASE/q.cy).toFixed(1)}× faster than the starter (Attempt ${q.a})`;line=`<div class=goal><b>🏁 Race result</b><span class=pos>${st} Escaped · attempt ${q.a}</span></div>`}
+ else{c='x';ic='💥';t=`Submitted · Caught at ${q.x.toFixed(0)} m`;d=`Cut more cycles and try again (Attempt ${q.a})`;line=`<div class=goal><b>🏁 Race result</b><span class=neg>Caught at ${q.x.toFixed(0)} m · attempt ${q.a}</span></div>`}
+ sr.className=q.s=='win'?'o':q.s=='run'?'':'x';sr.innerHTML=line;
+}
+let lastFocus=null;
+function closeModal(){$('#mo').classList.remove('on');$('#mo').setAttribute('aria-hidden','true');lastFocus&&lastFocus.focus&&lastFocus.focus()}
+function showWin(s,cyc,first){lastFocus=document.activeElement;const n=v=>v.toLocaleString(),last=cur>=PROBS.length-1,all=PROBS.every((_,i)=>PG.solved[i]);
+ H('mb',`<div class=em>🎉</div><h2 id=mt>Escaped!</h2><div class=st aria-label="${s} of 3 stars">${'★'.repeat(s)}<s>${'★'.repeat(3-s)}</s></div><div class=pts>${first?'+'+PTS+' points':'Points already earned'}</div><p>Problem ${cur+1} cleared · Team score <b>${score()}</b> / ${PROBS.length*PTS}</p><p><b>${n(cyc)}</b> cycles · <b>${(BASE/cyc).toFixed(1)}×</b> faster than the starter</p><p>Attempt ${attempts}</p>`+(all?`<div class=all>🏆 All ${PROBS.length} problems cleared! Total: ${PG.stars.reduce((a,b)=>a+b,0)} of ${PROBS.length*3} stars.</div>`:''));
+ const nb=$('#mnx');nb.textContent=last?'Start over ↺':'Next problem →';nb.onclick=()=>{closeModal();go(last?0:cur+1)};
+ $('#mo').classList.add('on');$('#mo').setAttribute('aria-hidden','false');nb.focus()}
+function retry(){closeModal();cancelAnimationFrame(anim);anim=null;subRes=null;shown=false;H('res','');$('#nx').hidden=true;lock(false);live();ed.focus()}
+$('#mx').onclick=closeModal;$('#mre').onclick=retry;
+$('#mo').onclick=e=>{if(e.target.id=='mo')closeModal()};
+document.addEventListener('keydown',e=>{if(e.key=='Escape'&&$('#mo').classList.contains('on'))closeModal()});
+function fx(k,m,c){const cv=$('#cv');if(k=='crash'){cv.classList.add('shake');setTimeout(()=>cv.classList.remove('shake'),500)}
+ const P=k=='win'?[...Array(60)].map(()=>({x:Math.random()*700,y:-Math.random()*150,vy:.6+Math.random()*1.2,c:['#f5d76e','#f0a9d0','#9be3c3','#8ec5ff'][Math.random()*4|0]})):[];let t0=null;
+ const step=ts=>{if(t0===null)t0=ts;const t=Math.min(1,(ts-t0)/1500);
+  if(k=='crash')draw(m,c,null,{dx:t*80,dy:Math.sin(Math.PI*t)*85,rot:t*4*Math.PI,cdx:t*25,boom:t<.4?t/.4:0,face:t<1?'🏃':'😵'});
+  else{P.forEach(p=>p.y+=p.vy*3);draw(m,c,null,{face:'🏆',parts:P})}
+  if(ts-t0<(k=='win'?2400:1600))anim=requestAnimationFrame(step);else anim=null};
+ anim=requestAnimationFrame(step)}
+function race(){cancelAnimationFrame(anim);anim=null;attempts++;lock(true);$('#cv').scrollIntoView({behavior:'smooth',block:'center'});
+ const R=last,v=R.v,cyc=R.cy,o=out(v),tEnd=o.caught?HEAD/(K-v):(LEN-HEAD)/v;let mx=HEAD,cx=0,gt=0,t0=null;H('res','🏁 Go!');subRes={s:'run'};renderSub();meterAt(R,0);
+ const step=ts=>{const dt=Math.min(.05,((ts-(t0??ts))/1000))*1.2;t0=ts;gt+=dt;mx+=v*dt;cx+=K*dt;meterAt(R,Math.min(1,gt/tEnd));draw(Math.min(mx,LEN),Math.min(cx,LEN));
+  if(cx>=mx){anim=null;meterAt(R,1);lock(false);H('res',`<span class=neg>💥 Caught at ${mx.toFixed(0)} m. Cut more cycles and try again. (Attempt ${attempts})</span>`);subRes={s:'lose',x:mx,a:attempts};renderSub();fx('crash',mx,cx)}
+  else if(mx>=LEN){anim=null;const s=cyc<=S3?3:2;meterAt(R,1);lock(false);H('res','');fx('win',LEN,cx);const fr=cleared(s);subRes={s:'win',stars:s,cy:cyc,p:cur+1,a:attempts};renderSub();setTimeout(()=>showWin(s,cyc,fr),500)}
+  else anim=requestAnimationFrame(step)};anim=requestAnimationFrame(step)}
+ed.oninput=()=>{subRes=null;shown=false;clearTimeout(tm);tm=setTimeout(live,250)};
+ed.onkeydown=e=>{if(e.key=='Tab'){e.preventDefault();const s=ed.selectionStart;ed.setRangeText('  ',s,ed.selectionEnd,'end');ed.oninput()}};
+$('#go').onclick=()=>{clearTimeout(tm);cancelAnimationFrame(anim);anim=null;shown=true;live();if(!last||last.err||last.bad){H('res','<span style="color:var(--warn)">⚠️ Fix the problem in the checks first. Then press Submit again.</span>');return}
+ race()};
+$('#rp').onclick=()=>{if(!shown)return;live();meter()};
+$('#sl').onmouseover=$('#sl').onclick=e=>{const i=e.target.closest('i');if(i&&last&&last.F){const n=+i.dataset.i,f=last.F[n];H('sh',`Bar ${n+1}: <b>${f[0]+f[1]+f[2]}</b> cycles · ${f[0]} memory · ${f[1]} wrong guesses · ${f[2]} math`)}};
+$('#rs').onclick=()=>{subRes=null;shown=false;cancelAnimationFrame(anim);anim=null;ed.value=P.s;H('res','');live()};
+let PG={solved:[],stars:[]};try{PG=JSON.parse(localStorage.getItem('cowchase-v2'))||PG}catch(e){}
+const save=()=>{try{localStorage.setItem('cowchase-v2',JSON.stringify(PG))}catch(e){}},isOpen=i=>i==0||PG.solved[i-1]||/unlock/.test(location.search),drafts=[];
+function tabs(){H('tabs',PROBS.map((p,i)=>`<button class=tab data-i=${i} ${i==cur?'aria-current=true':''} ${isOpen(i)?'':'disabled'}>${PG.solved[i]?'✅':isOpen(i)?'':'🔒'} ${i+1}. ${p.n}${PG.solved[i]?' '+'★'.repeat(PG.stars[i]||1):''}</button>`).join(''))}
+function cleared(s){const first=!PG.solved[cur];PG.solved[cur]=1;PG.stars[cur]=Math.max(PG.stars[cur]||0,s);save();tabs();
+ if(cur<PROBS.length-1){$('#nx').textContent='Next: problem '+(cur+2)+' → '+PROBS[cur+1].n;$('#nx').hidden=false}
+ renderTeam();syncTeam();return first}
+function go(i){subRes=null;shown=false;lock(false);if(P)drafts[cur]=ed.value;cancelAnimationFrame(anim);anim=null;cancelAnimationFrame(mt);cur=i;P=PROBS[i];attempts=0;
+ SEED=SEEDS[0];BASE=run(P.s).cy;REFS=SEEDS.map(sd=>{SEED=sd;return run(P.r)});REFR=REFS[0];GOAL=Math.ceil(REFR.cy*P.g);S3=Math.ceil(REFR.cy*(1+(P.g-1)/2));
+ ed.value=drafts[i]||P.s;
+ H('prob',`<div class=ph><h2>${P.n}</h2><span class=tag>${P.t}</span><span class=lvl>Problem ${i+1} of ${PROBS.length}</span></div><p class=task><b>Task:</b> ${P.k}</p><div class=chs><span class=ch>🎯 Goal <b>≤ ${GOAL.toLocaleString()}</b> cycles</span><span class=ch>Starter code <b>${BASE.toLocaleString()}</b> cycles</span><span class=ch>⭐ Worth <b>${PTS}</b> points</span></div>`);
+ H('hints','<p class=hn>Open one at a time. Later hints give away more.</p>'+P.h.map((x,j)=>`<details class="acc in" name="hint"><summary><span class=hl>Hint ${j+1}</span><span class=tt>${['Where to look','Why it is slow','The fix'][j]}</span><span class=sp role=img aria-label="Spoiler level ${j+1} of 3">${'<i class=on></i>'.repeat(j+1)}${'<i></i>'.repeat(2-j)}</span></summary><p>${x}</p></details>`).join(''));H('res','');$('#nx').hidden=true;tabs();live()}
+$('#tabs').onclick=e=>{const b=e.target.closest('.tab');if(b&&!b.disabled)go(+b.dataset.i)};
+$('#nx').onclick=()=>go(cur+1);
+{const f=PROBS.findIndex((_,i)=>!PG.solved[i]);go(f<0?0:f)}
+/* ---- team registration + score sync (Google Sheet) ---- */
+const SHEET_URL='https://script.google.com/macros/s/AKfycbw3dbybvQVR61QJzYXYyXft5Knx42cgIzAV4MEWcjDpML-T6WO-j02ButrTPEX4eIhf/exec';   // paste your Google Apps Script Web App URL here (ends with /exec)
+const REG_KEY='cowchase-team';let TEAM=null,SYNC='',Q=Promise.resolve();try{TEAM=JSON.parse(localStorage.getItem(REG_KEY))}catch(e){}
+const uid=()=>'t'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+const score=()=>PROBS.reduce((a,_,i)=>a+(PG.solved[i]?PTS:0),0),saveTeam=()=>{try{localStorage.setItem(REG_KEY,JSON.stringify(TEAM))}catch(e){}};
+if(TEAM&&!TEAM.id){TEAM.id=uid();TEAM.sent=-1;saveTeam()}
+async function post(d){if(!SHEET_URL)return'nourl';const body=JSON.stringify(d),hd={'Content-Type':'text/plain;charset=utf-8'},sg=()=>{const c=new AbortController();setTimeout(()=>c.abort(),15000);return c.signal};
+ try{const r=await fetch(SHEET_URL,{method:'POST',headers:hd,body,signal:sg()}),j=await r.json();if(j.ok)return'ok';console.warn('Sheet said:',j.error);return j.error==='name_taken'?'taken':'fail'}
+ catch(e){try{await fetch(SHEET_URL,{method:'POST',mode:'no-cors',headers:hd,body,signal:sg()});return'unknown'}catch(e2){return'fail'}}}
+function syncTeam(){return Q=Q.then(async()=>{if(!TEAM)return;const sc=Math.min(score(),PROBS.length*PTS);SYNC='wait';renderTeam();
+ const r=await post({id:TEAM.id,team:TEAM.team,p1:TEAM.p1,p2:TEAM.p2,score:sc});
+ SYNC={ok:'ok',unknown:'unk',nourl:'nourl'}[r]||'fail';TEAM.sent=r=='ok'?sc:-1;saveTeam();renderTeam()})}
+function resetProgress(){closeModal();PG={solved:[],stars:[]};save();drafts.length=0;P=null;cur=0;attempts=0;go(0)}
+function renderTeam(){if(!TEAM)return H('team','');
+ const m={ok:'☁ Saved to sheet',wait:'Saving…',unk:'⚠ Sent, but not confirmed',nourl:'⚠ Sheet not connected',fail:'⚠ Not saved yet'}[SYNC]||'';
+ H('team',`👥 Team <b>${esc(TEAM.team)}</b> · ${esc(TEAM.p1)} &amp; ${esc(TEAM.p2)} · ⭐ <b>${score()}</b> / ${PROBS.length*PTS} pts${m?' · '+m:''}${SYNC=='fail'||SYNC=='unk'?'<button class="btn alt sm" id="sy" type="button">Retry save</button>':''}<button class="btn alt sm" id="sw" type="button">Switch team</button>`);
+ $('#sw').onclick=()=>{if(confirm('Switch team? Progress on this device will be cleared.')){try{localStorage.removeItem(REG_KEY)}catch(e){}TEAM=null;SYNC='';['rt','rp1','rp2'].forEach(i=>$('#'+i).value='');$('#rerr').textContent='';resetProgress();applyTeam()}};
+ const y=$('#sy');if(y)y.onclick=syncTeam}
+function applyTeam(){const on=!!(TEAM&&TEAM.team);$('#reg').hidden=on;$('main').hidden=!on;$('#rwarn').hidden=!!SHEET_URL;
+ if(on)renderTeam();else $('#rt').focus()}
+$('#regf').onsubmit=async e=>{e.preventDefault();const v=id=>$('#'+id).value.trim().replace(/\s+/g,' '),d={team:v('rt'),p1:v('rp1'),p2:v('rp2')},er=$('#rerr'),b=$('#rgo'),done=()=>{b.disabled=false;b.textContent='▶ Play'};er.textContent='';
+ if(!d.team||!d.p1||!d.p2){er.textContent='Please fill out every field.';return}
+ if(d.p1.toLowerCase()===d.p2.toLowerCase()){er.textContent='Player 1 and Player 2 must be two different people.';return}
+ b.disabled=true;b.textContent='Saving…';
+ const t={id:uid(),...d},r=await post({...t,score:0});
+ if(r=='taken'){er.textContent='That team name is already registered. Please choose another.';done();return}
+ if(r=='fail'){er.textContent='Could not save your team. Check your internet connection and the Apps Script deployment, then try again.';done();return}
+ t.sent=r=='ok'?0:-1;TEAM=t;saveTeam();SYNC={ok:'ok',unknown:'unk',nourl:'nourl'}[r];done();resetProgress();applyTeam();window.scrollTo(0,0)};
+if(TEAM)SYNC=TEAM.sent===score()?'ok':'';
+applyTeam();if(TEAM&&TEAM.sent!==score())syncTeam();
+</script></body></html>
