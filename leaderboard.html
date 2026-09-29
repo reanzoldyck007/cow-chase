@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cow Chase: Live Leaderboard</title>
+<style>
+:root{--bg:#eef2f5;--card:#fff;--soft:#f5f8fa;--ink:#14212b;--mute:#5a6b78;--line:#d5dde3;--acc:#0e7c86;--good:#1e9e5a;--bad:#d64545;--warn:#c9820c;--gold:#e0a800;--silver:#8d99a5;--bronze:#b8733a;--rh:72px;--gap:10px;box-sizing:border-box}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0f171d;--card:#17222b;--soft:#1c2a34;--ink:#e6edf2;--mute:#93a4b1;--line:#2b3a45;--acc:#3cc4cf;--good:#38c07a;--bad:#ef6b6b;--warn:#f4b13e}}
+*,*:before,*:after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:1000px;margin:0 auto;padding:20px 16px 40px}
+header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+h1{font-size:clamp(1.5rem,4vw,2.4rem);margin:0;line-height:1.1}
+.sub{color:var(--mute);margin:2px 0 0;font-size:.9rem}.sp{flex:1}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:999px;background:var(--card);border:1px solid var(--line);font-size:.85rem;color:var(--mute)}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--warn)}.pill.ok .dot{background:var(--good);animation:pu 2s infinite}.pill.err .dot{background:var(--bad)}
+@keyframes pu{50%{opacity:.35}}
+.btn{font:inherit;font-size:.85rem;padding:5px 12px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}.btn:hover{border-color:var(--acc)}
+.stats{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 14px}.stat b{font-size:1.3rem;display:block}.stat small{color:var(--mute)}
+.cols{display:grid;grid-template-columns:56px minmax(0,1fr) 110px 120px;gap:14px;padding:0 16px 6px;color:var(--mute);font-size:.78rem;text-transform:uppercase;letter-spacing:.05em}
+.cols span:nth-child(3),.cols span:nth-child(4){text-align:right}
+#list{position:relative}
+.row{position:absolute;left:0;right:0;top:0;height:var(--rh);display:grid;grid-template-columns:56px minmax(0,1fr) 110px 120px;gap:14px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:0 16px;
+ transition:transform .8s cubic-bezier(.2,.8,.2,1),background .6s,border-color .6s;will-change:transform;animation:fi .6s ease-out}
+@keyframes fi{from{opacity:0}}
+.row.up{background:color-mix(in srgb,var(--good) 22%,var(--card))}.row.dn{background:color-mix(in srgb,var(--bad) 14%,var(--card))}
+.row.r1{border-color:var(--gold)}
+.rk{text-align:center;font-size:1.5rem;font-weight:700;color:var(--mute);line-height:1.1}
+.r1 .rk{color:var(--gold)}.r2 .rk{color:var(--silver)}.r3 .rk{color:var(--bronze)}
+.mv{display:block;font-size:.72rem;font-weight:700;height:.9rem}.mv.u{color:var(--good)}.mv.d{color:var(--bad)}
+.nm{font-weight:700;font-size:1.25rem}
+.bar{height:8px;border-radius:5px;background:var(--soft);margin-top:7px;overflow:hidden}.bar i{display:block;height:100%;background:var(--acc);border-radius:5px;transition:width .8s}
+.row.fin .bar i{background:var(--good)}
+.sc{text-align:right;font-variant-numeric:tabular-nums}.sc b{font-size:1.8rem;display:inline-block}.sc span{color:var(--mute);font-size:.85rem}
+.sc b.pop{animation:po .5s}@keyframes po{40%{transform:scale(1.35);color:var(--good)}}
+.tm{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;color:var(--mute)}.tm.fin{color:var(--goodt,var(--good))}.tm small{display:block;font-weight:400;font-size:.72rem}
+.msg{background:var(--card);border:1px dashed var(--line);border-radius:12px;padding:28px;text-align:center;color:var(--mute)}.msg.bad{border-color:var(--bad);color:var(--bad)}
+@media (max-width:620px){.cols,.row{grid-template-columns:40px minmax(0,1fr) 62px 78px;gap:8px;padding-left:10px;padding-right:10px}.sc b{font-size:1.4rem}.nm{font-size:1.05rem}}
+@media (prefers-reduced-motion:reduce){.row,.bar i{transition:none;animation:none}.sc b.pop,.pill.ok .dot{animation:none}}
+</style></head><body><main>
+<header><div><h1>🐄 Cow Chase Leaderboard</h1><p class="sub">10 points per problem, 50 maximum. Time runs from registration until the team reaches 50.</p></div>
+<span class="sp"></span><span class="pill" id="st"><i class="dot"></i><span id="stt">Connecting…</span></span><button class="btn" id="fs">⛶ Fullscreen</button></header>
+<div class="stats"><div class="stat"><b id="n">0</b><small>teams</small></div><div class="stat"><b id="fn">0</b><small>finished all 50</small></div><div class="stat"><b id="top">0</b><small>top score</small></div></div>
+<div class="cols"><span>Rank</span><span>Team</span><span>Score</span><span>Time to 50</span></div>
+<div id="list" role="list" aria-live="polite"></div>
+</main>
+<script>
+const SHEET_URL='https://script.google.com/macros/s/AKfycbw3dbybvQVR61QJzYXYyXft5Knx42cgIzAV4MEWcjDpML-T6WO-j02ButrTPEX4eIhf/exec';   // paste the same Apps Script Web App URL (ends with /exec) used in the game
+const EVERY=5000;     // refresh every 5 seconds
+const $=s=>document.querySelector(s);
+let els={},prevRank={},data=null,off=0,got=0,ok=false;
+const fmt=s=>{s=Math.max(0,Math.round(s));const h=s/3600|0,m=(s%3600)/60|0,x=s%60,p=v=>String(v).padStart(2,'0');return (h?h+':':'')+p(m)+':'+p(x)};
+function jsonp(){return new Promise((res,rej)=>{const cb='lb'+Date.now(),s=document.createElement('script'),done=()=>{clearTimeout(t);delete window[cb];s.remove()},t=setTimeout(()=>{done();rej(new Error('timeout'))},12000);
+ window[cb]=d=>{done();res(d)};s.onerror=()=>{done();rej(new Error('load failed'))};s.src=SHEET_URL+'?action=leaderboard&callback='+cb+'&t='+Date.now();document.head.appendChild(s)})}
+async function load(){if(!SHEET_URL)throw new Error('SHEET_URL is empty. Paste your Apps Script Web App URL in leaderboard.html.');
+ try{const r=await fetch(SHEET_URL+'?action=leaderboard&t='+Date.now());return await r.json()}catch(e){return jsonp()}}
+const status=(c,t)=>{$('#st').className='pill '+c;$('#stt').textContent=t};
+const step=()=>(document.querySelector('.row')?.offsetHeight||72)+10;
+function rank(T){return T.slice().sort((a,b)=>{
+ if(b.score!==a.score)return b.score-a.score;
+ const fa=a.finished>0,fb=b.finished>0;if(fa&&fb&&(a.finished-a.started)!==(b.finished-b.started))return(a.finished-a.started)-(b.finished-b.started);
+ return(a.updated-b.updated)||a.no-b.no})}
+function render(){const d=data,max=d.max||50,R=rank(d.teams||[]),L=$('#list'),H=step();
+ $('#n').textContent=R.length;$('#fn').textContent=R.filter(t=>t.score>=max).length;$('#top').textContent=R.length?R[0].score:0;
+ if(!R.length){L.style.height='auto';L.innerHTML='<div class="msg">No teams yet. Waiting for the first registration…</div>';els={};prevRank={};return}
+ if(L.querySelector('.msg'))L.innerHTML='';
+ L.style.height=(R.length*H-10)+'px';const seen={};
+ R.forEach((t,i)=>{seen[t.no]=1;let e=els[t.no];
+  if(!e){e=els[t.no]=document.createElement('div');e.className='row';e.setAttribute('role','listitem');
+   e.innerHTML='<div class="rk"><span class="r"></span><span class="mv"></span></div><div><div class="nm"></div><div class="bar"><i></i></div></div><div class="sc"><b></b> <span>/ '+max+'</span></div><div class="tm"></div>';
+   e.style.transform='translateY('+i*H+'px)';L.appendChild(e);e._s=t.score}
+  const old=prevRank[t.no];
+  e.style.transform='translateY('+i*H+'px)';
+  e.className='row r'+(i+1)+(t.score>=max?' fin':'')+(e.classList.contains('up')?' up':'')+(e.classList.contains('dn')?' dn':'');
+  e.querySelector('.r').textContent=['🥇','🥈','🥉'][i]||i+1;
+  e.querySelector('.nm').textContent='Team '+t.no;e.querySelector('.bar i').style.width=Math.min(100,t.score/max*100)+'%';
+  const b=e.querySelector('.sc b');b.textContent=t.score;if(t.score>e._s){b.classList.remove('pop');void b.offsetWidth;b.classList.add('pop')}e._s=t.score;
+  if(old!==undefined&&old!==i){const mv=e.querySelector('.mv'),up=i<old;mv.className='mv '+(up?'u':'d');mv.textContent=(up?'▲ ':'▼ ')+Math.abs(old-i);
+   e.classList.add(up?'up':'dn');clearTimeout(e._t);e._t=setTimeout(()=>{e.classList.remove('up','dn');mv.textContent=''},5000)}
+  e._t0=t;prevRank[t.no]=i});
+ Object.keys(els).forEach(k=>{if(!seen[k]){els[k].remove();delete els[k];delete prevRank[k]}});tick2()}
+function tick2(){if(!data)return;const now=Date.now()+off,max=data.max||50;
+ Object.values(els).forEach(e=>{const t=e._t0,c=e.querySelector('.tm');if(!t)return;
+  if(t.score>=max&&t.finished>0){c.className='tm fin';c.innerHTML='🏁 '+fmt((t.finished-t.started)/1000)+'<small>finished</small>'}
+  else if(t.started>0){c.className='tm';c.innerHTML='⏱ '+fmt((now-t.started)/1000)+'<small>running</small>'}
+  else c.textContent='—'})}
+async function poll(){try{const d=await load();if(!d||!d.ok)throw new Error(d&&d.error||'unexpected reply from the script');
+  data=d;off=d.now?d.now-Date.now():0;got=Date.now();ok=true;render()}
+ catch(e){ok=false;if(!got)$('#list').innerHTML='<div class="msg bad">Could not load scores.<br><small></small></div>',$('#list .msg small').textContent=e.message;status('err','Connection problem. Retrying…')}
+ finally{setTimeout(poll,EVERY)}}
+setInterval(()=>{tick2();if(ok&&got)status('ok','Live · updated '+Math.max(0,Math.round((Date.now()-got)/1000))+'s ago')},1000);
+addEventListener('resize',()=>data&&render());
+$('#fs').onclick=()=>document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen();
+poll();
+</script></body></html>
