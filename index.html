@@ -462,20 +462,20 @@ $('#nx').onclick=()=>go(cur+1);
 {const f=PROBS.findIndex((_,i)=>!PG.solved[i]);go(f<0?0:f)}
 /* ---- team registration + score sync (Google Sheet) ---- */
 const SHEET_URL='https://script.google.com/macros/s/AKfycbw3dbybvQVR61QJzYXYyXft5Knx42cgIzAV4MEWcjDpML-T6WO-j02ButrTPEX4eIhf/exec';   // paste your Google Apps Script Web App URL here (ends with /exec)
-const REG_KEY='cowchase-team';let TEAM=null,SYNC='',Q=Promise.resolve();try{TEAM=JSON.parse(localStorage.getItem(REG_KEY))}catch(e){}
+const REG_KEY='cowchase-team';let TEAM=null,SYNC='',LAST=null,Q=Promise.resolve();try{TEAM=JSON.parse(localStorage.getItem(REG_KEY))}catch(e){}
 const uid=()=>'t'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const score=()=>PROBS.reduce((a,_,i)=>a+(PG.solved[i]?PTS:0),0),saveTeam=()=>{try{localStorage.setItem(REG_KEY,JSON.stringify(TEAM))}catch(e){}};
 if(TEAM&&!TEAM.id){TEAM.id=uid();TEAM.sent=-1;saveTeam()}
 async function post(d){if(!SHEET_URL)return'nourl';const body=JSON.stringify(d),hd={'Content-Type':'text/plain;charset=utf-8'},sg=()=>{const c=new AbortController();setTimeout(()=>c.abort(),15000);return c.signal};
- try{const r=await fetch(SHEET_URL,{method:'POST',headers:hd,body,signal:sg()}),j=await r.json();if(j.ok)return'ok';console.warn('Sheet said:',j.error);return j.error==='name_taken'?'taken':'fail'}
+ try{const r=await fetch(SHEET_URL,{method:'POST',headers:hd,body,signal:sg()}),j=await r.json();if(j.ok){LAST=j;return'ok'}console.warn('Sheet said:',j.error);return j.error==='name_taken'?'taken':'fail'}
  catch(e){try{await fetch(SHEET_URL,{method:'POST',mode:'no-cors',headers:hd,body,signal:sg()});return'unknown'}catch(e2){return'fail'}}}
 function syncTeam(){return Q=Q.then(async()=>{if(!TEAM)return;const sc=Math.min(score(),PROBS.length*PTS);SYNC='wait';renderTeam();
  const r=await post({id:TEAM.id,team:TEAM.team,p1:TEAM.p1,p2:TEAM.p2,score:sc});
- SYNC={ok:'ok',unknown:'unk',nourl:'nourl'}[r]||'fail';TEAM.sent=r=='ok'?sc:-1;saveTeam();renderTeam()})}
+ if(r=='ok'&&LAST&&LAST.no)TEAM.no=LAST.no;SYNC={ok:'ok',unknown:'unk',nourl:'nourl'}[r]||'fail';TEAM.sent=r=='ok'?sc:-1;saveTeam();renderTeam()})}
 function resetProgress(){closeModal();PG={solved:[],stars:[]};save();drafts.length=0;P=null;cur=0;attempts=0;go(0)}
 function renderTeam(){if(!TEAM)return H('team','');
  const m={ok:'☁ Saved to sheet',wait:'Saving…',unk:'⚠ Sent, but not confirmed',nourl:'⚠ Sheet not connected',fail:'⚠ Not saved yet'}[SYNC]||'';
- H('team',`👥 Team <b>${esc(TEAM.team)}</b> · ${esc(TEAM.p1)} &amp; ${esc(TEAM.p2)} · ⭐ <b>${score()}</b> / ${PROBS.length*PTS} pts${m?' · '+m:''}${SYNC=='fail'||SYNC=='unk'?'<button class="btn alt sm" id="sy" type="button">Retry save</button>':''}<button class="btn alt sm" id="sw" type="button">Switch team</button>`);
+ H('team',`👥 ${TEAM.no?`<b>Team #${TEAM.no}</b> · `:''}<b>${esc(TEAM.team)}</b> · ${esc(TEAM.p1)} &amp; ${esc(TEAM.p2)} · ⭐ <b>${score()}</b> / ${PROBS.length*PTS} pts${m?' · '+m:''}${SYNC=='fail'||SYNC=='unk'?'<button class="btn alt sm" id="sy" type="button">Retry save</button>':''}<button class="btn alt sm" id="sw" type="button">Switch team</button>`);
  $('#sw').onclick=()=>{if(confirm('Switch team? Progress on this device will be cleared.')){try{localStorage.removeItem(REG_KEY)}catch(e){}TEAM=null;SYNC='';['rt','rp1','rp2'].forEach(i=>$('#'+i).value='');$('#rerr').textContent='';resetProgress();applyTeam()}};
  const y=$('#sy');if(y)y.onclick=syncTeam}
 function applyTeam(){const on=!!(TEAM&&TEAM.team);$('#reg').hidden=on;$('main').hidden=!on;$('#rwarn').hidden=!!SHEET_URL;
@@ -487,7 +487,7 @@ $('#regf').onsubmit=async e=>{e.preventDefault();const v=id=>$('#'+id).value.tri
  const t={id:uid(),...d},r=await post({...t,score:0});
  if(r=='taken'){er.textContent='That team name is already registered. Please choose another.';done();return}
  if(r=='fail'){er.textContent='Could not save your team. Check your internet connection and the Apps Script deployment, then try again.';done();return}
- t.sent=r=='ok'?0:-1;TEAM=t;saveTeam();SYNC={ok:'ok',unknown:'unk',nourl:'nourl'}[r];done();resetProgress();applyTeam();window.scrollTo(0,0)};
+ t.sent=r=='ok'?0:-1;if(r=='ok'&&LAST&&LAST.no)t.no=LAST.no;TEAM=t;saveTeam();SYNC={ok:'ok',unknown:'unk',nourl:'nourl'}[r];done();resetProgress();applyTeam();window.scrollTo(0,0)};
 if(TEAM)SYNC=TEAM.sent===score()?'ok':'';
 applyTeam();if(TEAM&&TEAM.sent!==score())syncTeam();
 </script></body></html>
